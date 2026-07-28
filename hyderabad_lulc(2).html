@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hyderabad LULC — Land Use / Land Cover Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Warm Editorial / Cartographic Sand Palette */
+    --bg-main: #f5f0eb;        /* Soft Warm Sand */
+    --card-bg: #fdfbf9;        /* Off-White Cream Panels */
+    --card-hover: #ebe4dc;     /* Subtle Warm Hover */
+    --border-color: #e2d9cf;   /* Soft Sandstone Border */
+    --border-highlight: #c7b8a8;
+    --text-dark: #271c19;      /* Dark Roasted Charcoal Text */
+    --text-muted: #78685f;     /* Muted Espresso */
+    
+    /* Vibrant Land Class Palette */
+    --builtup: #dc2626; /* Terracotta Red */
+    --green: #15803d;   /* Forest Green */
+    --water: #0369a1;   /* Deep Blue */
+    --barren: #d97706;  /* Warm Amber */
+    --accent: #c2410c;  /* Warm Copper Accent */
+  }
+
+  * { 
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    height: 100%;
+    background-color: var(--bg-main);
+    color: var(--text-dark);
+    font-family: 'Outfit', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d7c9bc; border-radius: 4px; }
+
+  /* Main Workspace Frame */
+  .container {
+    height: 100vh;
+    height: 100dvh;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background-image: radial-gradient(#d7c9bc 1.5px, transparent 1.5px);
+    background-size: 24px 24px;
+  }
+
+  /* Header Section */
+  header.title-block {
+    background: var(--card-bg);
+    padding: 14px 20px;
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--accent);
+    border-radius: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(39, 28, 25, 0.04);
+    flex: 0 0 auto;
+  }
+
+  .eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    margin-bottom: 2px;
+  }
+
+  h1 {
+    font-size: clamp(18px, 1.7vw, 24px);
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--text-dark);
+  }
+  h1 span {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 8px;
+  }
+
+  .coords {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dark);
+    text-align: right;
+    line-height: 1.5;
+    background: #eee6dc;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+
+  /* Body Grid (Enlarged Map on Left, Reduced Info Pane on Right) */
+  .panes {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 14px;
+  }
+
+  .pane {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(39, 28, 25, 0.04);
+  }
+
+  /* Pane 1: Map */
+  .pane-map .pane-body { padding: 0; height: 100%; position: relative; }
+  .pane-map iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+  .compass {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: rgba(253, 251, 249, 0.95);
+    border: 1px solid var(--border-color);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Pane 2: Tabbed Panel Styling */
+  .tab-header {
+    background: #eee6dc;
+    border-bottom: 1px solid var(--border-color);
+    padding: 10px 12px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .tab-btn:hover {
+    color: var(--text-dark);
+    background: rgba(39, 28, 25, 0.05);
+  }
+
+  .tab-btn.active {
+    background: var(--accent);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(194, 65, 12, 0.25);
+  }
+
+  .tab-content {
+    display: none;
+    padding: 20px;
+    flex: 1;
+    overflow-y: auto;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .tab-content.active {
+    display: flex;
+  }
+
+  /* Typography Inside Tabs */
+  .section-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+
+  .tab-content h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+
+  .tab-content p {
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text-dark);
+  }
+
+  /* Key Stats Grid in Intro Tab */
+  .meta-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 6px;
+  }
+
+  .meta-card {
+    background: #f5f0eb;
+    border: 1px solid var(--border-color);
+    padding: 10px 12px;
+    border-radius: 8px;
+  }
+
+  .meta-card .lbl {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .meta-card .val {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+
+  /* Donut Chart Styling inside Chart Tab */
+  .chart-flex {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    margin-top: 8px;
+  }
+
+  .donut-container {
+    position: relative;
+    width: 170px;
+    height: 170px;
+    filter: drop-shadow(0 4px 10px rgba(39, 28, 25, 0.08));
+  }
+
+  .donut-chart {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--builtup) 0% 68.11%,
+      var(--green) 68.11% 91.44%,
+      var(--water) 91.44% 99.09%,
+      var(--barren) 99.09% 100%
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .donut-center {
+    width: 110px;
+    height: 110px;
+    background: var(--card-bg);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+    text-align: center;
+  }
+
+  .donut-center .lbl {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .donut-center .val {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+
+  .legend-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: #f5f0eb;
+    border: 1px solid var(--border-color);
+  }
+
+  .legend-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .legend-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .legend-val b { color: var(--text-dark); }
+
+  code {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    background: #eee6dc;
+    border: 1px solid var(--border-color);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent);
+  }
+
+  /* Responsive Layout */
+  @media (max-width: 860px) {
+    body { overflow: auto; }
+    .container { height: auto; min-height: 100vh; }
+    .panes { grid-template-columns: 1fr; }
+    .pane-map { height: 50vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Main Header -->
+  <header class="title-block">
+    <div>
+      <p class="eyebrow">Land Use / Land Cover Explorer</p>
+      <h1>Hyderabad Metropolitan Region
+        <span>Sentinel-2 supervised classification, Jan – Jun 2025</span>
+      </h1>
+    </div>
+    <div class="coords">
+      <div>17°23′ N, 78°29′ E</div>
+      <div>Classifier: CART (smileCart) · Scale 10 m</div>
+    </div>
+  </header>
+
+  <div class="panes">
+
+    <!-- MAP PANE (Left Side) -->
+    <div class="pane pane-map">
+      <div class="pane-body">
+        <div class="compass">N↑</div>
+        <iframe
+          src="https://tanisha-ee.projects.earthengine.app/view/lulchyderabad"
+          title="Hyderabad LULC — Earth Engine App"
+          loading="lazy"
+          allowfullscreen>
+        </iframe>
+      </div>
+    </div>
+
+    <!-- TABBED INFO PANE (Right Side) -->
+    <div class="pane pane-tabs">
+      
+      <!-- Tab Controls Header -->
+      <div class="tab-header">
+        <button class="tab-btn active" onclick="switchTab(event, 'tab-intro')">Introduction</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-chart')">Area Chart</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-details')">Details & Method</button>
+      </div>
+
+      <!-- TAB 1: INTRODUCTION -->
+      <div id="tab-intro" class="tab-content active">
+        <div>
+          <span class="section-tag">Overview</span>
+          <h2>Project Overview</h2>
+        </div>
+        <p>This project demonstrates how cloud-based geospatial processing can be used to prepare and communicate a land-cover classification for a rapidly changing metropolitan region.</p>
+        <p>Using Sentinel-2 satellite imagery processed in Google Earth Engine, this interactive explorer distinguishes major surface-cover categories across Hyderabad to analyze urban expansion and environmental patterns.</p>
+        
+        <div class="meta-cards-grid">
+          <div class="meta-card">
+            <span class="lbl">Study Area</span>
+            <span class="val">Hyderabad, Telangana</span>
+          </div>
+          <div class="meta-card">
+            <span class="lbl">Reference Period</span>
+            <span class="val">Jan – Jun 2025</span>
+          </div>
+          <div class="meta-card">
+            <span class="lbl">Platform</span>
+            <span class="val">Earth Engine</span>
+          </div>
+          <div class="meta-card">
+            <span class="lbl">Resolution</span>
+            <span class="val">10 Meters</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: SAMPLE CHART -->
+      <div id="tab-chart" class="tab-content">
+        <div>
+          <span class="section-tag">Land Area Distribution</span>
+          <h2>Class Composition</h2>
+        </div>
+        
+        <div class="chart-flex">
+          <div class="donut-container">
+            <div class="donut-chart">
+              <div class="donut-center">
+                <span class="lbl">Total Area</span>
+                <span class="val">47,303<br><small style="font-size:10px; color:var(--text-muted); font-weight:400;">acres</small></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="legend-list">
+            <div class="legend-item">
+              <span class="legend-label">
+                <span class="swatch" style="background:var(--builtup); box-shadow: 0 0 4px var(--builtup);"></span>Built-up
+              </span>
+              <span class="legend-val"><b>32,220 ac</b> (68.1%)</span>
+            </div>
+
+            <div class="legend-item">
+              <span class="legend-label">
+                <span class="swatch" style="background:var(--green); box-shadow: 0 0 4px var(--green);"></span>Green Space
+              </span>
+              <span class="legend-val"><b>11,035 ac</b> (23.3%)</span>
+            </div>
+
+            <div class="legend-item">
+              <span class="legend-label">
+                <span class="swatch" style="background:var(--water); box-shadow: 0 0 4px var(--water);"></span>Waterbodies
+              </span>
+              <span class="legend-val"><b>3,620 ac</b> (7.7%)</span>
+            </div>
+
+            <div class="legend-item">
+              <span class="legend-label">
+                <span class="swatch" style="background:var(--barren); box-shadow: 0 0 4px var(--barren);"></span>Barren Land
+              </span>
+              <span class="legend-val"><b>429 ac</b> (0.9%)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: DETAILS & INTERPRETATION -->
+      <div id="tab-details" class="tab-content">
+        <div>
+          <span class="section-tag">Technical Details</span>
+          <h2>Methodology & Interpretation</h2>
+        </div>
+
+        <p><strong>Classification Method:</strong> Built using a Sentinel-2 surface reflectance composite averaged over Jan–Jun 2025. A CART decision-tree classifier (<code>ee.Classifier.smileCart</code>) was trained on digitized reference points across 4 distinct classes using RGB surface reflectance bands at 10m resolution.</p>
+
+        <p><strong>Interpretation:</strong> Built-up land dominates the classified extent (~68%), reflecting Hyderabad's rapid IT and industrial corridor growth. Green spaces (~23%) account for remaining urban tree canopy and agricultural pockets. Waterbodies (~7.7%) capture key historic reservoirs such as Hussain Sagar.</p>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function switchTab(event, tabId) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(tab => {
+      tab.classList.remove('active');
+    });
+
+    // Remove active class from all buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.remove('active');
+    });
+
+    // Show current tab and set active button style
+    document.getElementById(tabId).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
